@@ -67,6 +67,7 @@ export default function GeneratePage({ setTab, pantryItems, onAddRecipe }) {
   const [mealType, setMealType] = useState(MEAL_TYPES[0]);
   const [effort, setEffort] = useState(EFFORTS[0]);
   const [mood, setMood] = useState(MOODS[0]);
+  const [customRequest, setCustomRequest] = useState("");
 
   // Results
   const [generating, setGenerating] = useState(false);
@@ -127,6 +128,7 @@ Generate 5 meal recipes with these preferences:
 - Cooking effort: ${effort}
 - Mood: ${mood}
 - Daily macro targets: 3,400 cal, 195g protein, 120g fat, 240g carbs
+${customRequest ? `- Special request: ${customRequest}` : ""}
 
 IMPORTANT: Primarily use the ingredients listed above. You may include basic pantry staples (salt, pepper, oil, butter) even if not listed.
 
@@ -342,6 +344,18 @@ Return ONLY a valid JSON array, no other text:
             <DropdownSelect id="type" label="Meal Type (optional)" options={MEAL_TYPES} value={mealType} onChange={setMealType} />
             <DropdownSelect id="effort" label="Cooking Effort (optional)" options={EFFORTS} value={effort} onChange={setEffort} />
             <DropdownSelect id="mood" label="Mood / Vibe (optional)" options={MOODS} value={mood} onChange={setMood} />
+
+            {/* Custom request */}
+            <div style={labelStyle}>Custom Request (optional)</div>
+            <textarea value={customRequest} onChange={e => setCustomRequest(e.target.value)}
+              placeholder="e.g. 'No dairy', 'Make it spicy', 'Something I can eat with one hand', 'Wife doesn't like onions'..."
+              rows={3}
+              style={{
+                width: "100%", background: T.surfaceHigh, border: `1px solid ${T.border}`,
+                borderRadius: 8, padding: "10px 12px", color: T.text, fontSize: 13,
+                fontFamily: "inherit", outline: "none", boxSizing: "border-box",
+                resize: "vertical", marginBottom: 16,
+              }} />
 
             {error && (
               <div style={{ color: "#e05252", fontSize: 13, textAlign: "center", marginBottom: 12 }}>{error}</div>
