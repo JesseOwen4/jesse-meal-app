@@ -1,6 +1,8 @@
 import { useState } from "react";
 import T from "../theme";
 import Icon from "../components/Icon";
+import BarcodeScanner from "../components/BarcodeScanner";
+import { lookupBarcode } from "../utils/nutritionLookup";
 
 const CATEGORIES = [
   { key: "Meat", color: T.accent },
@@ -23,6 +25,39 @@ export default function PantryPage({ setTab, pantryItems, pantryActions }) {
   const [editingId, setEditingId] = useState(null);
   const [editQty, setEditQty] = useState("");
   const [newItem, setNewItem] = useState({ name: "", quantity: "", unit: "lbs", category: "Pantry", low_threshold: "2" });
+  const [scanning, setScanning] = useState(false);
+  const [scannedProduct, setScannedProduct] = useState(null);
+  const [lookingUp, setLookingUp] = useState(false);
+
+  const handleBarcode = async (barcode) => {
+    setScanning(false);
+    setLookingUp(true);
+    const result = await lookupBarcode(barcode);
+    setLookingUp(false);
+    if (result.found) {
+      setScannedProduct(result);
+    } else {
+      setScannedProduct({ found: false, barcode });
+    }
+  };
+
+  const saveScannedProduct = async () => {
+    if (!scannedProduct?.found) return;
+    const ok = await pantryActions.addItem({
+      name: scannedProduct.name + (scannedProduct.brand ? ` (${scannedProduct.brand})` : ""),
+      quantity: 1,
+      unit: "units",
+      category: "Pantry",
+      low_threshold: 1,
+      calories: scannedProduct.macros.calories,
+      protein: scannedProduct.macros.protein,
+      fat: scannedProduct.macros.fat,
+      carbs: scannedProduct.macros.carbs,
+      serving_size: scannedProduct.servingSize,
+      barcode: scannedProduct.barcode,
+    });
+    if (ok) setScannedProduct(null);
+  };
 
   const grouped = {};
   CATEGORIES.forEach(c => { grouped[c.key] = []; });
@@ -59,10 +94,16 @@ export default function PantryPage({ setTab, pantryItems, pantryActions }) {
           </button>
           <div style={{ fontSize: 18, color: T.text }}>Pantry</div>
         </div>
-        <button onClick={() => setShowAdd(true)} style={{
-          background: T.accent, border: "none", borderRadius: 8,
-          padding: "7px 14px", color: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-        }}>+ Add Item</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setScanning(true)} style={{
+            background: T.surface, border: `1px solid ${T.green}`, borderRadius: 8,
+            padding: "7px 12px", color: T.green, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+          }}>📷 Scan</button>
+          <button onClick={() => setShowAdd(true)} style={{
+            background: T.accent, border: "none", borderRadius: 8,
+            padding: "7px 14px", color: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+          }}>+ Add</button>
+        </div>
       </div>
 
       {isEmpty ? (
@@ -88,6 +129,12 @@ export default function PantryPage({ setTab, pantryItems, pantryActions }) {
                     }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14, color: T.text }}>{item.name}</div>
+                        {item.calories > 0 && (
+                          <div style={{ fontSize: 11, color: T.accent, marginTop: 1 }}>
+                            {item.calories} cal · {item.protein}g P · {item.fat}g F · {item.carbs}g C
+                            {item.serving_size ? ` (per ${item.serving_size})` : ""}
+                          </div>
+                        )}
                         {editingId === item.id ? (
                           <input value={editQty} onChange={e => setEditQty(e.target.value)}
                             onBlur={() => handleEditSave(item.id)}
@@ -114,6 +161,93 @@ export default function PantryPage({ setTab, pantryItems, pantryActions }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Barcode Scanner */}
+      {scanning && (
+        <BarcodeScanner
+          onDetected={handleBarcode}
+          onClose={() => setScanning(false)}
+        />
+      )}
+
+      {/* Looking up barcode */}
+      {lookingUp && (
+        <div style={{ position: "fixed", inset: 0, background: "#000a", zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ color: T.text, fontSize: 16 }}>Looking up product...</div>
+        </div>
+      )}
+
+      {/* Scanned Product Review */}
+      {scannedProduct && (
+        <div style={{ position: "fixed", inset: 0, background: "#000a", zIndex: 100, display: "flex", alignItems: "flex-end" }}
+          onClick={e => { if (e.target === e.currentTarget) setScannedProduct(null); }}>
+          <div style={{
+            background: T.surface, borderRadius: "16px 16px 0 0",
+            width: "100%", maxWidth: 480, margin: "0 auto", padding: 20,
+          }}>
+            {scannedProduct.found ? (
+              <>
+                <div style={{ fontSize: 16, color: T.text, marginBottom: 4 }}>{scannedProduct.name}</div>
+                {scannedProduct.brand && <div style={{ fontSize: 12, color: T.textDim, marginBottom: 12 }}>{scannedProduct.brand}</div>}
+                {scannedProduct.image && (
+                  <img src={scannedProduct.image} alt="" style={{ width: 80, height: 80, objectFit: "contain", borderRadius: 8, marginBottom: 12 }} />
+                )}
+                <div style={{
+                  background: T.surfaceHigh, borderRadius: 10, padding: "12px 16px", marginBottom: 16,
+                }}>
+                  <div style={{ fontSize: 10, color: T.textDim, letterSpacing: 2, marginBottom: 8 }}>
+                    NUTRITION {scannedProduct.per === "serving" ? `(per serving${scannedProduct.servingSize ? ` — ${scannedProduct.servingSize}` : ""})` : "(per 100g)"}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+                    {[
+                      ["Calories", scannedProduct.macros.calories, T.accent],
+                      ["Protein", scannedProduct.macros.protein + "g", T.green],
+                      ["Fat", scannedProduct.macros.fat + "g", T.blue],
+                      ["Carbs", scannedProduct.macros.carbs + "g", T.purple],
+                    ].map(([label, val, color]) => (
+                      <div key={label} style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 18, fontWeight: "bold", color }}>{val}</div>
+                        <div style={{ fontSize: 9, color: T.textDim }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setScannedProduct(null)} style={{
+                    flex: 1, padding: 12, borderRadius: 8, background: T.surfaceHigh,
+                    border: `1px solid ${T.border}`, color: T.textDim, fontSize: 14,
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}>Cancel</button>
+                  <button onClick={saveScannedProduct} style={{
+                    flex: 2, padding: 12, borderRadius: 8, background: T.accent,
+                    border: "none", color: "#fff", fontSize: 14,
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}>Add to Pantry</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 16, color: T.text, marginBottom: 8 }}>Product Not Found</div>
+                <div style={{ fontSize: 13, color: T.textDim, marginBottom: 16 }}>
+                  Barcode {scannedProduct.barcode} wasn't found in the database. You can add it manually.
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setScannedProduct(null)} style={{
+                    flex: 1, padding: 12, borderRadius: 8, background: T.surfaceHigh,
+                    border: `1px solid ${T.border}`, color: T.textDim, fontSize: 14,
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}>Close</button>
+                  <button onClick={() => { setScannedProduct(null); setShowAdd(true); }} style={{
+                    flex: 1, padding: 12, borderRadius: 8, background: T.accent,
+                    border: "none", color: "#fff", fontSize: 14,
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}>Add Manually</button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
