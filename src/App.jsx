@@ -19,6 +19,7 @@ import PhotoLogPage from "./pages/PhotoLogPage";
 import ReceiptScanPage from "./pages/ReceiptScanPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
+import ScanRecipePage from "./pages/ScanRecipePage";
 
 // Components
 import BottomNav from "./components/BottomNav";
@@ -31,6 +32,8 @@ import { usePantry } from "./hooks/usePantry";
 import { usePhotoLog } from "./hooks/usePhotoLog";
 import { useNotifications } from "./hooks/useNotifications";
 import { useAuth } from "./hooks/useAuth";
+import { useRecipes } from "./hooks/useRecipes";
+import EditRecipeModal from "./components/EditRecipeModal";
 
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
 export default function App() {
@@ -74,6 +77,8 @@ export default function App() {
   const weightLog = useWeightLog();
   const pantry = usePantry();
   const photoLog = usePhotoLog();
+  const recipeData = useRecipes();
+  const [editingRecipe, setEditingRecipe] = useState(null); // null = closed, {} = new, {id,...} = edit
 
   // ── Notifications ──
   useNotifications(notificationSettings, loggedMeals, activeDay);
@@ -228,7 +233,19 @@ export default function App() {
         )}
 
         {tab === "ideas" && (
-          <RecipesTab expandedIdea={expandedIdea} setExpandedIdea={setExpandedIdea} />
+          <RecipesTab
+            grouped={recipeData.grouped}
+            recipeActions={recipeData}
+            onScan={() => setTab("scan-recipe")}
+            onEdit={(recipe) => setEditingRecipe(recipe === null ? {} : recipe)}
+          />
+        )}
+
+        {tab === "scan-recipe" && (
+          <ScanRecipePage
+            setTab={setTab}
+            onSaveRecipe={recipeData.addRecipe}
+          />
         )}
 
         {tab === "grocery" && (
@@ -308,6 +325,21 @@ export default function App() {
         <SwapModal
           meal={swapMeal.meal} day={swapMeal.day}
           onSwap={handleSwap} onClose={() => setSwapMeal(null)}
+        />
+      )}
+
+      {editingRecipe !== null && (
+        <EditRecipeModal
+          recipe={editingRecipe.id ? editingRecipe : null}
+          onSave={async (data) => {
+            if (editingRecipe.id) {
+              await recipeData.updateRecipe(editingRecipe.id, data);
+            } else {
+              await recipeData.addRecipe(data);
+            }
+            setEditingRecipe(null);
+          }}
+          onClose={() => setEditingRecipe(null)}
         />
       )}
 
