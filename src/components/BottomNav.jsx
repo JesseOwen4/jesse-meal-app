@@ -20,11 +20,10 @@ export default function BottomNav({ tab, setTab, viewMode }) {
   const tabs = viewMode === "prep" ? PREP_TABS : JESSE_TABS;
 
   return (
-    <div style={{
+    <div className="bottom-nav" style={{
       position: "fixed", bottom: 0, left: 0, right: 0,
       background: T.surface,
       borderTop: `1px solid ${T.border}`, zIndex: 10,
-      paddingBottom: "env(safe-area-inset-bottom, 0px)",
     }}>
       <div style={{ display: "flex", maxWidth: 480, margin: "0 auto" }}>
         {tabs.map(item => (
