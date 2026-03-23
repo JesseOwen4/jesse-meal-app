@@ -174,7 +174,7 @@ export default function App() {
 
   return (
     <div style={{
-      height: "100%", maxWidth: 480, margin: "0 auto",
+      height: "100dvh", maxWidth: 480, margin: "0 auto",
       background: T.bg, fontFamily: "Georgia, 'Palatino Linotype', serif",
       color: T.text, display: "flex", flexDirection: "column", position: "relative",
       overflow: "hidden",

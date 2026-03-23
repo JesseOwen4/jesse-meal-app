@@ -6,14 +6,17 @@
 
 html, body {
   height: 100%;
+  height: 100dvh;
   background: #16181f;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
+  overflow: hidden;
 }
 
 #root {
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background: #0e0f14;
 }
