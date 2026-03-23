@@ -28,7 +28,7 @@ export default function BottomNav({ tab, setTab, viewMode }) {
       <div style={{ display: "flex", maxWidth: 480, margin: "0 auto" }}>
         {tabs.map(item => (
           <button key={item.id} onClick={() => setTab(item.id)} style={{
-            flex: 1, padding: "14px 4px 14px",
+            flex: 1, padding: "14px 4px 18px",
             background: "none", border: "none",
             color: tab === item.id ? T.accent : T.textDim,
             cursor: "pointer", fontFamily: "inherit",
