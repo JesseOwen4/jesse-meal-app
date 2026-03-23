@@ -199,7 +199,7 @@ export default function App() {
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: T.textDim }}>Shared w/ wife ✓</div>
+            <div style={{ fontSize: 11, color: T.textDim }}>Synced ✓</div>
           </div>
         </div>
         {/* Macro targets (hide in prep mode) */}

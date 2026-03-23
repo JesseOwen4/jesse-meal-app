@@ -53,7 +53,7 @@ export default function GroceryTab({
               letterSpacing: 0.5,
             }}
           >
-            Shared · syncs with your wife in real time
+            Shared · syncs in real time
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

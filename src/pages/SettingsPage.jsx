@@ -128,7 +128,7 @@ export default function SettingsPage({
               onClick={() => setViewMode("prep")}
               style={pillStyle(viewMode === "prep")}
             >
-              Prep Mode (Wife)
+              Prep Mode
             </button>
           </div>
         </div>
