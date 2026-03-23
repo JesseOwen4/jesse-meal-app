@@ -30,9 +30,15 @@ export default function LoginPage({ onSignIn, onSignUp, onResetPassword }) {
     if (mode === "signup") {
       if (password !== confirmPassword) { setError("Passwords don't match"); setSubmitting(false); return; }
       if (password.length < 6) { setError("Password must be at least 6 characters"); setSubmitting(false); return; }
-      const { error } = await onSignUp(email, password);
-      if (error) setError(error.message);
-      else setMessage("Account created! You're now logged in.");
+      const { error, data } = await onSignUp(email, password);
+      if (error) {
+        setError(error.message);
+      } else if (data?.user && !data?.session) {
+        setMessage("Check your email to confirm your account, then sign in.");
+        setMode("login");
+      } else {
+        setMessage("Account created! You're now logged in.");
+      }
     } else {
       const { error } = await onSignIn(email, password);
       if (error) setError(error.message);
