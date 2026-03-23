@@ -174,15 +174,16 @@ export default function App() {
 
   return (
     <div style={{
-      minHeight: "100vh", maxWidth: 480, margin: "0 auto",
+      height: "100%", maxWidth: 480, margin: "0 auto",
       background: T.bg, fontFamily: "Georgia, 'Palatino Linotype', serif",
       color: T.text, display: "flex", flexDirection: "column", position: "relative",
+      overflow: "hidden",
     }}>
       {/* ── HEADER ── */}
       <div style={{
         background: T.surface, borderBottom: `1px solid ${T.border}`,
-        padding: "16px 20px 14px", position: "sticky", top: 0, zIndex: 10,
-        isolation: "isolate",
+        padding: "16px 20px 14px", paddingTop: "calc(16px + env(safe-area-inset-top, 0px))",
+        flexShrink: 0, zIndex: 10,
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>

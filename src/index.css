@@ -4,8 +4,13 @@
   box-sizing: border-box;
 }
 
-body {
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
   background: #0e0f14;
+}
+
+body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
