@@ -1,62 +1,67 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 import T from "../theme";
 
 export default function BarcodeScanner({ onDetected, onClose }) {
-  const [manualCode, setManualCode] = useState("");
-  const fileRef = useRef(null);
-  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
+  const [manualCode, setManualCode] = useState("");
+  const scannerRef = useRef(null);
+  const html5QrRef = useRef(null);
+  const detectedRef = useRef(false);
 
-  const handlePhoto = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setProcessing(true);
-    setError("");
+  useEffect(() => {
+    const scannerId = "barcode-reader";
+    let scanner = null;
 
-    try {
-      // Use Grok Vision to read the barcode from the photo
-      const apiKey = import.meta.env.VITE_XAI_API_KEY;
-      if (!apiKey) { setError("API key not configured"); setProcessing(false); return; }
+    const startScanner = async () => {
+      try {
+        scanner = new Html5Qrcode(scannerId);
+        html5QrRef.current = scanner;
 
-      // Convert file to base64
-      const base64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.readAsDataURL(file);
-      });
-
-      const res = await fetch("https://api.x.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "grok-2-vision-1212",
-          messages: [{
-            role: "user",
-            content: [
-              { type: "image_url", image_url: { url: base64 } },
-              { type: "text", text: "Read the barcode number from this image. Return ONLY the numeric barcode digits, nothing else. If you can't read it, return 'NONE'." }
-            ]
-          }],
-        }),
-      });
-
-      const data = await res.json();
-      const code = data.choices?.[0]?.message?.content?.trim().replace(/\D/g, "");
-
-      if (code && code.length >= 8) {
-        onDetected(code);
-      } else {
-        setError("Couldn't read the barcode. Try again or enter it manually.");
+        await scanner.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: { width: 280, height: 150 },
+            aspectRatio: 1.0,
+          },
+          (decodedText) => {
+            if (detectedRef.current) return;
+            const code = decodedText.replace(/\D/g, "");
+            if (code.length >= 8) {
+              detectedRef.current = true;
+              scanner.stop().catch(() => {});
+              onDetected(code);
+            }
+          },
+          () => {} // ignore errors during scanning
+        );
+      } catch (err) {
+        setError("Camera access denied. You can enter the barcode manually below.");
       }
-    } catch {
-      setError("Failed to process image. Try entering the barcode manually.");
+    };
+
+    startScanner();
+
+    return () => {
+      if (html5QrRef.current) {
+        html5QrRef.current.stop().catch(() => {});
+        html5QrRef.current.clear().catch(() => {});
+      }
+    };
+  }, []);
+
+  const handleClose = () => {
+    if (html5QrRef.current) {
+      html5QrRef.current.stop().catch(() => {});
     }
-    setProcessing(false);
+    onClose();
   };
 
   const handleManual = () => {
     const code = manualCode.trim().replace(/\D/g, "");
     if (code.length >= 8) {
+      if (html5QrRef.current) html5QrRef.current.stop().catch(() => {});
       onDetected(code);
     } else {
       setError("Enter a valid barcode (at least 8 digits)");
@@ -65,62 +70,58 @@ export default function BarcodeScanner({ onDetected, onClose }) {
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "#000a", zIndex: 200,
-      display: "flex", alignItems: "flex-end",
-    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      position: "fixed", inset: 0, background: T.bg, zIndex: 200,
+      display: "flex", flexDirection: "column",
+    }}>
+      {/* Header */}
       <div style={{
-        background: T.surface, borderRadius: "16px 16px 0 0",
-        width: "100%", maxWidth: 480, margin: "0 auto", padding: 20,
+        padding: "16px 20px", background: T.surface,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexShrink: 0,
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ fontSize: 16, color: T.text }}>Scan Barcode</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: T.textDim, fontSize: 20, cursor: "pointer" }}>✕</button>
-        </div>
+        <div style={{ fontSize: 16, color: T.text }}>Scan Barcode</div>
+        <button onClick={handleClose} style={{
+          background: "none", border: "none", color: T.textDim, fontSize: 20, cursor: "pointer",
+        }}>✕</button>
+      </div>
 
-        {/* Camera capture */}
-        <input ref={fileRef} type="file" accept="image/*" capture="environment"
-          onChange={handlePhoto} style={{ display: "none" }} />
+      {/* Camera view */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div id="barcode-reader" style={{
+          width: "100%", flex: 1,
+        }} />
+      </div>
 
-        <button onClick={() => fileRef.current?.click()} disabled={processing} style={{
-          width: "100%", padding: "16px 0", borderRadius: 10, marginBottom: 12,
-          background: T.accent, border: "none",
-          color: "#fff", fontSize: 15, cursor: "pointer", fontFamily: "inherit",
-          opacity: processing ? 0.6 : 1,
-        }}>
-          {processing ? "Reading barcode..." : "📷 Take Photo of Barcode"}
-        </button>
+      {/* Bottom panel */}
+      <div style={{ padding: "16px 20px", background: T.surface, flexShrink: 0 }}>
+        {!error && (
+          <div style={{ fontSize: 13, color: T.textDim, textAlign: "center", marginBottom: 12 }}>
+            Point camera at a barcode
+          </div>
+        )}
 
-        {/* Divider */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-          <div style={{ flex: 1, height: 1, background: T.border }} />
-          <span style={{ fontSize: 12, color: T.textDim }}>or type it in</span>
-          <div style={{ flex: 1, height: 1, background: T.border }} />
-        </div>
+        {error && (
+          <div style={{ fontSize: 13, color: T.accent, textAlign: "center", marginBottom: 12 }}>
+            {error}
+          </div>
+        )}
 
-        {/* Manual entry */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <input value={manualCode} onChange={e => setManualCode(e.target.value)}
-            placeholder="Enter barcode number..."
+        {/* Manual fallback */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={manualCode} onChange={e => { setManualCode(e.target.value); setError(""); }}
+            placeholder="Or type barcode number..."
             type="tel" inputMode="numeric"
             onKeyDown={e => e.key === "Enter" && handleManual()}
             style={{
               flex: 1, background: T.surfaceHigh, border: `1px solid ${T.border}`,
-              borderRadius: 8, padding: "12px 14px", color: T.text, fontSize: 15,
+              borderRadius: 8, padding: "12px", color: T.text, fontSize: 14,
               fontFamily: "inherit", outline: "none",
             }} />
           <button onClick={handleManual} style={{
             padding: "12px 16px", borderRadius: 8,
             background: T.green, border: "none",
-            color: "#fff", fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+            color: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
           }}>Look Up</button>
-        </div>
-
-        {error && (
-          <div style={{ color: "#e05252", fontSize: 13, textAlign: "center", marginBottom: 8 }}>{error}</div>
-        )}
-
-        <div style={{ fontSize: 11, color: T.textDim, textAlign: "center" }}>
-          The barcode number is usually printed below the barcode lines
         </div>
       </div>
     </div>
