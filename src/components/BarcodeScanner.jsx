@@ -13,10 +13,23 @@ export default function BarcodeScanner({ onDetected, onClose }) {
     setProcessing(true);
     setError("");
 
-    // Convert to base64
+    // Compress and convert to base64
     const base64 = await new Promise(r => {
+      const img = new Image();
       const reader = new FileReader();
-      reader.onload = () => r(reader.result);
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const maxW = 1200;
+          let w = img.width, h = img.height;
+          if (w > maxW) { h = (maxW / w) * h; w = maxW; }
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          r(canvas.toDataURL("image/jpeg", 0.85));
+        };
+        img.src = e.target.result;
+      };
       reader.readAsDataURL(file);
     });
 
@@ -53,7 +66,7 @@ export default function BarcodeScanner({ onDetected, onClose }) {
             role: "user",
             content: [
               { type: "image_url", image_url: { url: base64 } },
-              { type: "text", text: "Find and read the barcode number in this image. Look for UPC, EAN, or other product barcodes. Return ONLY the numeric digits. If no barcode found, return NONE." }
+              { type: "text", text: "This is a photo of a product barcode. Read the numbers printed BELOW the barcode lines. These are typically 8-13 digits. Also check for any UPC, EAN, or SKU numbers on the packaging. Return ONLY the digits, nothing else. Example: 041420012345" }
             ]
           }],
         }),
@@ -61,12 +74,21 @@ export default function BarcodeScanner({ onDetected, onClose }) {
 
       const data = await res.json();
       const raw = data.choices?.[0]?.message?.content?.trim() || "";
-      const code = raw.replace(/\D/g, "");
+      // Extract all digit sequences and find the longest one that's 8+ digits
+      const digitGroups = raw.match(/\d{8,14}/g);
 
-      if (code.length >= 8) {
+      if (digitGroups && digitGroups.length > 0) {
+        // Use the longest match (most likely the full barcode)
+        const code = digitGroups.sort((a, b) => b.length - a.length)[0];
         onDetected(code);
       } else {
-        setError("Couldn't read barcode. Try a closer, well-lit photo or enter the number manually.");
+        // Try just stripping all non-digits
+        const allDigits = raw.replace(/\D/g, "");
+        if (allDigits.length >= 8 && allDigits.length <= 14) {
+          onDetected(allDigits);
+        } else {
+          setError("Couldn't read barcode. Try getting closer with good lighting, or enter the number manually.");
+        }
       }
     } catch {
       setError("Failed to process. Try again or enter manually.");
