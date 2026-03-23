@@ -1,72 +1,160 @@
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
 import T from "../theme";
 
 export default function BarcodeScanner({ onDetected, onClose }) {
   const [error, setError] = useState("");
   const [manualCode, setManualCode] = useState("");
-  const [started, setStarted] = useState(false);
-  const html5QrRef = useRef(null);
-  const detectedRef = useRef(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const canvasRef = useRef(null);
+  const scanningRef = useRef(true);
 
+  // Start camera directly with getUserMedia
   useEffect(() => {
-    // Small delay to ensure DOM is ready
-    const timeout = setTimeout(() => {
-      const el = document.getElementById("barcode-reader");
-      if (!el) { setError("Scanner container not found"); return; }
+    let mounted = true;
 
-      const scanner = new Html5Qrcode("barcode-reader");
-      html5QrRef.current = scanner;
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
 
-      scanner.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 120 },
-        },
-        (decodedText) => {
-          if (detectedRef.current) return;
-          // Accept any decoded text with enough digits
-          const code = decodedText.replace(/\D/g, "");
-          if (code.length >= 8) {
-            detectedRef.current = true;
-            scanner.stop().catch(() => {});
-            onDetected(code);
-          }
-        },
-        () => {}
-      ).then(() => {
-        setStarted(true);
-      }).catch((err) => {
-        console.error("Scanner error:", err);
-        setError("Could not access camera. Enter barcode manually below.");
-      });
-    }, 500);
+        if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.setAttribute("playsinline", "true");
+          videoRef.current.play();
+          setCameraReady(true);
+        }
+      } catch (err) {
+        if (mounted) setError("Could not access camera. Enter barcode manually below.");
+      }
+    }
+
+    startCamera();
 
     return () => {
-      clearTimeout(timeout);
-      if (html5QrRef.current) {
-        try { html5QrRef.current.stop(); } catch {}
-        try { html5QrRef.current.clear(); } catch {}
+      mounted = false;
+      scanningRef.current = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
       }
     };
   }, []);
 
-  const handleClose = () => {
-    if (html5QrRef.current) {
-      try { html5QrRef.current.stop(); } catch {}
+  // Periodically capture frames and send to BarcodeDetector API (if available)
+  // or use html5-qrcode's static scan as fallback
+  useEffect(() => {
+    if (!cameraReady) return;
+
+    // Check if browser has native BarcodeDetector
+    const hasNative = "BarcodeDetector" in window;
+    let detector = null;
+
+    if (hasNative) {
+      try {
+        detector = new window.BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
+      } catch {}
     }
+
+    if (!detector) {
+      // No native detector — fall back to manual only
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      if (!scanningRef.current || !videoRef.current || !detector) return;
+
+      try {
+        const barcodes = await detector.detect(videoRef.current);
+        if (barcodes.length > 0) {
+          const code = barcodes[0].rawValue.replace(/\D/g, "");
+          if (code.length >= 8) {
+            scanningRef.current = false;
+            if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+            onDetected(code);
+          }
+        }
+      } catch {}
+    }, 300);
+
+    return () => clearInterval(interval);
+  }, [cameraReady]);
+
+  const handleClose = () => {
+    scanningRef.current = false;
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
     onClose();
   };
 
   const handleManual = () => {
     const code = manualCode.trim().replace(/\D/g, "");
     if (code.length >= 8) {
-      if (html5QrRef.current) try { html5QrRef.current.stop(); } catch {}
+      scanningRef.current = false;
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
       onDetected(code);
     } else {
       setError("Enter a valid barcode (at least 8 digits)");
     }
+  };
+
+  // Capture frame and use Grok to read barcode
+  const [capturing, setCapturing] = useState(false);
+  const captureAndRead = async () => {
+    if (!videoRef.current) return;
+    setCapturing(true);
+    setError("");
+
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      canvas.getContext("2d").drawImage(videoRef.current, 0, 0);
+
+      const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.9));
+      const base64 = await new Promise(r => {
+        const reader = new FileReader();
+        reader.onload = () => r(reader.result);
+        reader.readAsDataURL(blob);
+      });
+
+      const apiKey = import.meta.env.VITE_XAI_API_KEY;
+      if (!apiKey) { setError("API key not configured"); setCapturing(false); return; }
+
+      const res = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "grok-2-vision-1212",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: base64 } },
+              { type: "text", text: "Read the barcode number from this image. Return ONLY the numeric digits of the barcode, nothing else. If you cannot find or read a barcode, return exactly: NONE" }
+            ]
+          }],
+        }),
+      });
+
+      const data = await res.json();
+      const raw = data.choices?.[0]?.message?.content?.trim() || "";
+      const code = raw.replace(/\D/g, "");
+
+      if (code.length >= 8) {
+        scanningRef.current = false;
+        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+        onDetected(code);
+      } else {
+        setError("Couldn't read barcode. Try holding steadier or enter it manually.");
+      }
+    } catch {
+      setError("Failed to read. Try again or enter manually.");
+    }
+    setCapturing(false);
   };
 
   return (
@@ -86,13 +174,25 @@ export default function BarcodeScanner({ onDetected, onClose }) {
         }}>✕</button>
       </div>
 
-      {/* Camera area — fixed height so html5-qrcode has real dimensions */}
-      <div style={{
-        width: "100%", height: 350, background: "#000",
-        position: "relative", overflow: "hidden",
-      }}>
-        <div id="barcode-reader" style={{ width: "100%", height: "100%" }} />
-        {!started && !error && (
+      {/* Camera feed */}
+      <div style={{ width: "100%", height: 300, background: "#000", position: "relative", overflow: "hidden" }}>
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+        {/* Scanning guide overlay */}
+        <div style={{
+          position: "absolute", top: "50%", left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 260, height: 100,
+          border: `2px solid ${T.accent}`,
+          borderRadius: 8,
+          pointerEvents: "none",
+        }} />
+        {!cameraReady && !error && (
           <div style={{
             position: "absolute", inset: 0, display: "flex",
             alignItems: "center", justifyContent: "center",
@@ -102,24 +202,27 @@ export default function BarcodeScanner({ onDetected, onClose }) {
         )}
       </div>
 
-      {/* Bottom panel */}
-      <div style={{ padding: "20px", background: T.surface, flex: 1 }}>
-        {!error && started && (
-          <div style={{ fontSize: 13, color: T.green, textAlign: "center", marginBottom: 16 }}>
-            📷 Camera active — point at a barcode
-          </div>
+      {/* Controls */}
+      <div style={{ padding: "16px 20px", background: T.surface, flex: 1, overflowY: "auto" }}>
+        {cameraReady && (
+          <button onClick={captureAndRead} disabled={capturing} style={{
+            width: "100%", padding: "14px 0", borderRadius: 10, marginBottom: 16,
+            background: T.accent, border: "none",
+            color: "#fff", fontSize: 15, cursor: "pointer", fontFamily: "inherit",
+            opacity: capturing ? 0.6 : 1,
+          }}>
+            {capturing ? "Reading..." : "📸 Capture & Read Barcode"}
+          </button>
         )}
 
         {error && (
-          <div style={{ fontSize: 13, color: T.accent, textAlign: "center", marginBottom: 16 }}>
-            {error}
-          </div>
+          <div style={{ fontSize: 13, color: "#e05252", textAlign: "center", marginBottom: 12 }}>{error}</div>
         )}
 
         {/* Divider */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <div style={{ flex: 1, height: 1, background: T.border }} />
-          <span style={{ fontSize: 12, color: T.textDim }}>or enter manually</span>
+          <span style={{ fontSize: 12, color: T.textDim }}>or type it in</span>
           <div style={{ flex: 1, height: 1, background: T.border }} />
         </div>
 
@@ -139,10 +242,6 @@ export default function BarcodeScanner({ onDetected, onClose }) {
             background: T.green, border: "none",
             color: "#fff", fontSize: 14, cursor: "pointer", fontFamily: "inherit",
           }}>Look Up</button>
-        </div>
-
-        <div style={{ fontSize: 11, color: T.textDim, textAlign: "center", marginTop: 12 }}>
-          The barcode number is printed below the barcode lines on the package
         </div>
       </div>
     </div>
