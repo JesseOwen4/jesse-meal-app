@@ -20,7 +20,7 @@ export default function BottomNav({ tab, setTab, viewMode }) {
   const tabs = viewMode === "prep" ? PREP_TABS : JESSE_TABS;
 
   return (
-    <div className="bottom-nav" style={{
+    <div style={{
       position: "fixed", bottom: 0, left: 0, right: 0,
       background: T.surface,
       borderTop: `1px solid ${T.border}`, zIndex: 10,
