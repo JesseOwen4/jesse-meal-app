@@ -21,25 +21,26 @@ export default function BottomNav({ tab, setTab, viewMode }) {
 
   return (
     <div style={{
-      position: "fixed", bottom: 0, left: 0, right: 0,
-      background: T.surface,
-      borderTop: `1px solid ${T.border}`, display: "flex", zIndex: 10,
-      paddingBottom: 0,
+      position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
+      width: "100%", maxWidth: 480, background: T.surface,
+      borderTop: `1px solid ${T.border}`, zIndex: 10,
     }}>
-      {tabs.map(item => (
-        <button key={item.id} onClick={() => setTab(item.id)} style={{
-          flex: 1, padding: "14px 4px 10px",
-          background: "none", border: "none",
-          color: tab === item.id ? T.accent : T.textDim,
-          cursor: "pointer", fontFamily: "inherit",
-          display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-          transition: "color 0.15s",
-        }}>
-          <Icon name={item.icon} size={26} color={tab === item.id ? T.accent : T.textDim} />
-          <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase" }}>{item.label}</div>
-          {tab === item.id && <div style={{ width: 5, height: 5, borderRadius: "50%", background: T.accent }} />}
-        </button>
-      ))}
+      <div style={{ display: "flex" }}>
+        {tabs.map(item => (
+          <button key={item.id} onClick={() => setTab(item.id)} style={{
+            flex: 1, padding: "14px 4px 10px",
+            background: "none", border: "none",
+            color: tab === item.id ? T.accent : T.textDim,
+            cursor: "pointer", fontFamily: "inherit",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+            transition: "color 0.15s",
+          }}>
+            <Icon name={item.icon} size={26} color={tab === item.id ? T.accent : T.textDim} />
+            <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase" }}>{item.label}</div>
+            {tab === item.id && <div style={{ width: 5, height: 5, borderRadius: "50%", background: T.accent }} />}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

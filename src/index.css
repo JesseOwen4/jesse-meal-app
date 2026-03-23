@@ -4,21 +4,13 @@
   box-sizing: border-box;
 }
 
-html {
+html, body {
   height: 100%;
-  /* This color shows behind the iPhone home bar */
-  background: #16181f;
-}
-
-body {
-  height: 100%;
-  margin: 0;
-  /* Match the nav bar color so home indicator area blends */
+  /* This color shows in the iPhone home indicator area */
   background: #16181f;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
-  overflow: hidden;
 }
 
 #root {

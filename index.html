@@ -5,23 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#16181f" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.json" />
-    <style>
-      /* Force dark color behind iPhone home indicator */
-      @supports (padding-bottom: env(safe-area-inset-bottom)) {
-        html::after {
-          content: '';
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          height: env(safe-area-inset-bottom, 0px);
-          background: #16181f;
-          z-index: 9999;
-        }
-      }
-    </style>
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Jesse's Meal Plan</title>
