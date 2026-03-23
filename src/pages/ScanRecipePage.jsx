@@ -62,7 +62,7 @@ export default function ScanRecipePage({ setTab, onSaveRecipe }) {
   "macros": "estimated calories and protein if possible, e.g. 680 cal · 52g P, or empty string if unknown",
   "time": "estimated cook time, e.g. 15 min",
   "desc": "brief description of how to make it, 2-3 sentences",
-  "ingredients": ["ingredient 1 with amount", "ingredient 2 with amount"],
+  "ingredients": [{"qty": "4 strips", "name": "thick-cut bacon"}, {"qty": "4 large", "name": "eggs"}],
   "tip": "optional cooking tip or empty string"
 }`
         }
@@ -83,13 +83,19 @@ export default function ScanRecipePage({ setTab, onSaveRecipe }) {
 
       try {
         const parsed = JSON.parse(jsonStr);
+        const ings = (parsed.ingredients || []).map(i => {
+          if (typeof i === "object" && i.name) return { qty: i.qty || "", name: i.name };
+          const str = String(i);
+          const m = str.match(/^([\d½⅓¼¾⅔⅛]+\s*\S*)\s+(.+)$/);
+          return m ? { qty: m[1].trim(), name: m[2].trim() } : { qty: "", name: str };
+        });
         setExtracted({
           name: parsed.name || "",
           category: parsed.category || "🥗 Other",
           macros: parsed.macros || "",
           time: parsed.time || "",
           desc: parsed.desc || "",
-          ingredients: parsed.ingredients || [],
+          ingredients: ings,
           tip: parsed.tip || "",
           notes: "",
         });
@@ -103,17 +109,17 @@ export default function ScanRecipePage({ setTab, onSaveRecipe }) {
   };
 
   const updateField = (key, val) => setExtracted(prev => ({ ...prev, [key]: val }));
-  const updateIngredient = (i, val) => {
+  const updateIngredient = (i, field, val) => {
     const next = [...extracted.ingredients];
-    next[i] = val;
+    next[i] = { ...next[i], [field]: val };
     updateField("ingredients", next);
   };
   const removeIngredient = (i) => updateField("ingredients", extracted.ingredients.filter((_, idx) => idx !== i));
-  const addIngredient = () => updateField("ingredients", [...extracted.ingredients, ""]);
+  const addIngredient = () => updateField("ingredients", [...extracted.ingredients, { qty: "", name: "" }]);
 
   const saveRecipe = async () => {
     if (!extracted?.name) return;
-    const data = { ...extracted, ingredients: extracted.ingredients.filter(i => i.trim()) };
+    const data = { ...extracted, ingredients: extracted.ingredients.filter(i => i.name?.trim()) };
     const ok = await onSaveRecipe(data);
     if (ok) setTab("ideas");
   };
@@ -257,12 +263,14 @@ export default function ScanRecipePage({ setTab, onSaveRecipe }) {
 
             <div style={labelStyle}>Ingredients</div>
             {extracted.ingredients.map((ing, i) => (
-              <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                <input value={ing} onChange={e => updateIngredient(i, e.target.value)}
-                  style={{ ...inputStyle, flex: 1 }} />
+              <div key={i} style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                <input value={ing.qty || ""} onChange={e => updateIngredient(i, "qty", e.target.value)}
+                  placeholder="Qty" style={{ ...inputStyle, width: 80, flex: "none" }} />
+                <input value={ing.name || ""} onChange={e => updateIngredient(i, "name", e.target.value)}
+                  placeholder="Ingredient" style={{ ...inputStyle, flex: 1 }} />
                 <button onClick={() => removeIngredient(i)} style={{
-                  padding: "8px 12px", background: T.surfaceHigh, border: `1px solid ${T.border}`,
-                  borderRadius: 8, color: T.textDim, cursor: "pointer", fontSize: 16,
+                  padding: "8px 10px", background: T.surfaceHigh, border: `1px solid ${T.border}`,
+                  borderRadius: 8, color: T.textDim, cursor: "pointer", fontSize: 16, flexShrink: 0,
                 }}>✕</button>
               </div>
             ))}

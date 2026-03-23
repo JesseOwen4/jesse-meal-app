@@ -1,5 +1,6 @@
 import { useState } from "react";
 import T from "../theme";
+import { estimateMacros } from "../hooks/useRecipes";
 
 const CATEGORIES = ["🍳 Breakfast", "🎒 Portable Meals", "⚡ Snacks & Sides", "🥩 Dinner", "🥗 Other"];
 
@@ -10,26 +11,36 @@ export default function EditRecipeModal({ recipe, onSave, onClose }) {
     macros: recipe?.macros || "",
     time: recipe?.time || "",
     desc: recipe?.desc || "",
-    ingredients: recipe?.ingredients || [""],
+    ingredients: recipe?.ingredients?.length ? recipe.ingredients : [{ name: "", qty: "" }],
     tip: recipe?.tip || "",
     notes: recipe?.notes || "",
   });
+  const [estimating, setEstimating] = useState(false);
 
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }));
 
-  const updateIngredient = (i, val) => {
+  const updateIngredient = (i, field, val) => {
     const next = [...form.ingredients];
-    next[i] = val;
+    next[i] = { ...next[i], [field]: val };
     set("ingredients", next);
   };
   const removeIngredient = (i) => set("ingredients", form.ingredients.filter((_, idx) => idx !== i));
-  const addIngredient = () => set("ingredients", [...form.ingredients, ""]);
+  const addIngredient = () => set("ingredients", [...form.ingredients, { name: "", qty: "" }]);
+
+  const handleEstimate = async () => {
+    const validIngs = form.ingredients.filter(i => i.name.trim());
+    if (validIngs.length === 0) return;
+    setEstimating(true);
+    const result = await estimateMacros(validIngs);
+    if (result) set("macros", result);
+    setEstimating(false);
+  };
 
   const handleSave = () => {
     if (!form.name.trim()) return;
     const data = {
       ...form,
-      ingredients: form.ingredients.filter(i => i.trim()),
+      ingredients: form.ingredients.filter(i => i.name.trim()),
     };
     onSave(data);
   };
@@ -75,35 +86,17 @@ export default function EditRecipeModal({ recipe, onSave, onClose }) {
           ))}
         </div>
 
-        {/* Macros + Time */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-          <div>
-            <div style={labelStyle}>Macros</div>
-            <input value={form.macros} onChange={e => set("macros", e.target.value)}
-              placeholder="680 cal · 52g P" style={inputStyle} />
-          </div>
-          <div>
-            <div style={labelStyle}>Cook Time</div>
-            <input value={form.time} onChange={e => set("time", e.target.value)}
-              placeholder="10 min" style={inputStyle} />
-          </div>
-        </div>
-
-        {/* Description */}
-        <div style={labelStyle}>Description</div>
-        <textarea value={form.desc} onChange={e => set("desc", e.target.value)}
-          placeholder="How to make it..." rows={3}
-          style={{ ...inputStyle, resize: "vertical", marginBottom: 12 }} />
-
-        {/* Ingredients */}
+        {/* Ingredients — name + qty */}
         <div style={labelStyle}>Ingredients</div>
         {form.ingredients.map((ing, i) => (
-          <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <input value={ing} onChange={e => updateIngredient(i, e.target.value)}
-              placeholder="Ingredient" style={{ ...inputStyle, flex: 1 }} />
+          <div key={i} style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+            <input value={ing.qty} onChange={e => updateIngredient(i, "qty", e.target.value)}
+              placeholder="Qty" style={{ ...inputStyle, width: 80, flex: "none" }} />
+            <input value={ing.name} onChange={e => updateIngredient(i, "name", e.target.value)}
+              placeholder="Ingredient name" style={{ ...inputStyle, flex: 1 }} />
             <button onClick={() => removeIngredient(i)} style={{
-              padding: "8px 12px", background: T.surfaceHigh, border: `1px solid ${T.border}`,
-              borderRadius: 8, color: T.textDim, cursor: "pointer", fontSize: 16,
+              padding: "8px 10px", background: T.surfaceHigh, border: `1px solid ${T.border}`,
+              borderRadius: 8, color: T.textDim, cursor: "pointer", fontSize: 16, flexShrink: 0,
             }}>✕</button>
           </div>
         ))}
@@ -112,6 +105,30 @@ export default function EditRecipeModal({ recipe, onSave, onClose }) {
           border: `1px dashed ${T.border}`, borderRadius: 8,
           color: T.textDim, fontSize: 12, cursor: "pointer", fontFamily: "inherit", marginBottom: 12,
         }}>+ Add ingredient</button>
+
+        {/* Macros + estimate button */}
+        <div style={labelStyle}>Macros</div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <input value={form.macros} onChange={e => set("macros", e.target.value)}
+            placeholder="680 cal · 52g P" style={{ ...inputStyle, flex: 1 }} />
+          <button onClick={handleEstimate} disabled={estimating} style={{
+            padding: "10px 12px", borderRadius: 8, flexShrink: 0,
+            background: T.green, border: "none",
+            color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+            opacity: estimating ? 0.6 : 1,
+          }}>{estimating ? "..." : "⚡ Estimate"}</button>
+        </div>
+
+        {/* Cook time */}
+        <div style={labelStyle}>Cook Time</div>
+        <input value={form.time} onChange={e => set("time", e.target.value)}
+          placeholder="10 min" style={{ ...inputStyle, marginBottom: 12 }} />
+
+        {/* Description */}
+        <div style={labelStyle}>Description</div>
+        <textarea value={form.desc} onChange={e => set("desc", e.target.value)}
+          placeholder="How to make it..." rows={3}
+          style={{ ...inputStyle, resize: "vertical", marginBottom: 12 }} />
 
         {/* Tip */}
         <div style={labelStyle}>Tip (optional)</div>

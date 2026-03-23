@@ -74,7 +74,14 @@ export default function RecipesTab({ grouped, recipeActions, onScan, onEdit }) {
                           Ingredients
                         </div>
                         <ul style={{ margin: 0, padding: "0 0 0 16px", color: T.textMid, fontSize: 13, lineHeight: 1.8 }}>
-                          {recipe.ingredients.map((ing, j) => <li key={j}>{ing}</li>)}
+                          {recipe.ingredients.map((ing, j) => (
+                            <li key={j}>
+                              {typeof ing === "object"
+                                ? <>{ing.qty && <span style={{ color: T.text }}>{ing.qty}</span>} {ing.name}</>
+                                : ing
+                              }
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     )}
