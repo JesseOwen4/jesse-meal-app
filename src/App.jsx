@@ -18,6 +18,7 @@ import MealPrepPage from "./pages/MealPrepPage";
 import PhotoLogPage from "./pages/PhotoLogPage";
 import ReceiptScanPage from "./pages/ReceiptScanPage";
 import SettingsPage from "./pages/SettingsPage";
+import LoginPage from "./pages/LoginPage";
 
 // Components
 import BottomNav from "./components/BottomNav";
@@ -29,9 +30,27 @@ import { useWeightLog } from "./hooks/useWeightLog";
 import { usePantry } from "./hooks/usePantry";
 import { usePhotoLog } from "./hooks/usePhotoLog";
 import { useNotifications } from "./hooks/useNotifications";
+import { useAuth } from "./hooks/useAuth";
 
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
 export default function App() {
+  // ── Auth ──
+  const auth = useAuth();
+
+  // Show login if not authenticated
+  if (auth.loading) return (
+    <div style={{ minHeight: "100vh", background: "#0e0f14", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: "#555a6a", fontFamily: "Georgia, serif", fontSize: 14 }}>Loading...</div>
+    </div>
+  );
+
+  if (!auth.user) return (
+    <LoginPage
+      onSignIn={auth.signIn}
+      onSignUp={auth.signUp}
+      onResetPassword={auth.resetPassword}
+    />
+  );
   // ── Navigation ──
   const [tab, setTab] = useState("plan");
   const [activeDay, setActiveDay] = useState(getTodayName);
@@ -286,6 +305,7 @@ export default function App() {
             viewMode={vm} setViewMode={setViewMode}
             weighInFrequency={weighInFrequency} setWeighInFrequency={setWeighInFrequency}
             goalWeight={goalWeight} setGoalWeight={setGoalWeight}
+            onSignOut={auth.signOut}
           />
         )}
       </div>

@@ -88,6 +88,7 @@ export default function SettingsPage({
   setWeighInFrequency,
   goalWeight,
   setGoalWeight,
+  onSignOut,
 }) {
   const notifEnabled = notificationSettings?.enabled ?? false;
   const reminders = notificationSettings?.reminders?.length
@@ -214,6 +215,17 @@ export default function SettingsPage({
           </div>
         </div>
       </div>
+
+      {/* Sign Out */}
+      {onSignOut && (
+        <div style={{ padding: "0 20px 20px" }}>
+          <button onClick={onSignOut} style={{
+            width: "100%", padding: "14px 0", background: "none",
+            border: `1px solid #e05252`, borderRadius: 10,
+            color: "#e05252", fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+          }}>Sign Out</button>
+        </div>
+      )}
     </div>
   );
 }
