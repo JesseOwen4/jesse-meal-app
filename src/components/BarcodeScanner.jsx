@@ -1,6 +1,51 @@
 import { useState, useRef } from "react";
 import T from "../theme";
 
+// Decode barcode from an image using ZBar WASM (local, no API call)
+async function decodeBarcode(imageFile) {
+  // Load ZBar WASM dynamically
+  const { scanImageData } = await import("@undecaf/zbar-wasm");
+
+  // Load image into canvas to get ImageData
+  const bitmap = await createImageBitmap(imageFile);
+  const canvas = document.createElement("canvas");
+  // Use a reasonable size — too large is slow, too small loses detail
+  const maxW = 1400;
+  let w = bitmap.width, h = bitmap.height;
+  if (w > maxW) { h = Math.round((maxW / w) * h); w = maxW; }
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  const imageData = ctx.getImageData(0, 0, w, h);
+
+  // Scan for barcodes
+  const symbols = await scanImageData(imageData);
+
+  if (symbols.length > 0) {
+    // Return the first barcode found
+    const code = symbols[0].decode();
+    return code;
+  }
+
+  // Try again with higher contrast (helps with poor lighting)
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    const val = avg > 128 ? 255 : 0; // threshold to pure black/white
+    data[i] = data[i + 1] = data[i + 2] = val;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  const bwImageData = ctx.getImageData(0, 0, w, h);
+  const bwSymbols = await scanImageData(bwImageData);
+
+  if (bwSymbols.length > 0) {
+    return bwSymbols[0].decode();
+  }
+
+  return null;
+}
+
 export default function BarcodeScanner({ onDetected, onClose }) {
   const [manualCode, setManualCode] = useState("");
   const [error, setError] = useState("");
@@ -13,86 +58,23 @@ export default function BarcodeScanner({ onDetected, onClose }) {
     setProcessing(true);
     setError("");
 
-    // Compress and convert to base64
-    const base64 = await new Promise(r => {
-      const img = new Image();
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const maxW = 1200;
-          let w = img.width, h = img.height;
-          if (w > maxW) { h = (maxW / w) * h; w = maxW; }
-          canvas.width = w;
-          canvas.height = h;
-          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-          r(canvas.toDataURL("image/jpeg", 0.85));
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-
-    // Try native BarcodeDetector first (fast, no API call)
-    if ("BarcodeDetector" in window) {
-      try {
-        const img = new Image();
-        img.src = base64;
-        await new Promise(r => { img.onload = r; });
-        const detector = new window.BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
-        const barcodes = await detector.detect(img);
-        if (barcodes.length > 0) {
-          const code = barcodes[0].rawValue.replace(/\D/g, "");
-          if (code.length >= 8) {
-            setProcessing(false);
-            onDetected(code);
-            return;
-          }
-        }
-      } catch {}
-    }
-
-    // Fallback: send to Grok Vision
     try {
-      const apiKey = import.meta.env.VITE_XAI_API_KEY;
-      if (!apiKey) { setError("API key not configured"); setProcessing(false); return; }
-
-      const res = await fetch("https://api.x.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "grok-2-vision-1212",
-          messages: [{
-            role: "user",
-            content: [
-              { type: "image_url", image_url: { url: base64 } },
-              { type: "text", text: "This is a photo of a product barcode. Read the numbers printed BELOW the barcode lines. These are typically 8-13 digits. Also check for any UPC, EAN, or SKU numbers on the packaging. Return ONLY the digits, nothing else. Example: 041420012345" }
-            ]
-          }],
-        }),
-      });
-
-      const data = await res.json();
-      const raw = data.choices?.[0]?.message?.content?.trim() || "";
-      // Extract all digit sequences and find the longest one that's 8+ digits
-      const digitGroups = raw.match(/\d{8,14}/g);
-
-      if (digitGroups && digitGroups.length > 0) {
-        // Use the longest match (most likely the full barcode)
-        const code = digitGroups.sort((a, b) => b.length - a.length)[0];
-        onDetected(code);
-      } else {
-        // Try just stripping all non-digits
-        const allDigits = raw.replace(/\D/g, "");
-        if (allDigits.length >= 8 && allDigits.length <= 14) {
-          onDetected(allDigits);
+      const code = await decodeBarcode(file);
+      if (code) {
+        const digits = code.replace(/\D/g, "");
+        if (digits.length >= 8) {
+          onDetected(digits);
         } else {
-          setError("Couldn't read barcode. Try getting closer with good lighting, or enter the number manually.");
+          onDetected(code);
         }
+      } else {
+        setError("Couldn't read barcode. Try getting closer with good lighting, or enter the number below.");
       }
-    } catch {
-      setError("Failed to process. Try again or enter manually.");
+    } catch (err) {
+      console.error("Barcode scan error:", err);
+      setError("Failed to process image. Try again or enter the number manually.");
     }
+
     setProcessing(false);
     e.target.value = "";
   };
@@ -130,15 +112,15 @@ export default function BarcodeScanner({ onDetected, onClose }) {
           color: "#fff", fontSize: 16, cursor: "pointer", fontFamily: "inherit",
           opacity: processing ? 0.6 : 1,
         }}>
-          {processing ? "Reading barcode..." : "📷 Take Photo of Barcode"}
+          {processing ? "⏳ Reading barcode..." : "📷 Take Photo of Barcode"}
         </button>
 
         <div style={{ fontSize: 12, color: T.textDim, textAlign: "center", marginBottom: 16 }}>
-          Get close to the barcode — make sure it's in focus
+          Hold phone steady, get close, make sure barcode is in focus
         </div>
 
         {error && (
-          <div style={{ color: "#e05252", fontSize: 13, textAlign: "center", marginBottom: 12 }}>{error}</div>
+          <div style={{ color: "#e05252", fontSize: 13, textAlign: "center", marginBottom: 12, padding: "8px", background: "#e0525215", borderRadius: 8 }}>{error}</div>
         )}
 
         {/* Divider */}
@@ -167,7 +149,7 @@ export default function BarcodeScanner({ onDetected, onClose }) {
         </div>
 
         <div style={{ fontSize: 11, color: T.textDim, textAlign: "center" }}>
-          The number is printed below the barcode lines
+          The number is printed below the barcode lines on the package
         </div>
       </div>
     </div>
