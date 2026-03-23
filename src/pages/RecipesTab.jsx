@@ -2,7 +2,7 @@ import { useState } from "react";
 import T from "../theme";
 import Icon from "../components/Icon";
 
-export default function RecipesTab({ grouped, recipeActions, onScan, onEdit }) {
+export default function RecipesTab({ grouped, recipeActions, onScan, onEdit, onGenerate }) {
   const [expandedId, setExpandedId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -11,17 +11,22 @@ export default function RecipesTab({ grouped, recipeActions, onScan, onEdit }) {
   return (
     <div style={{ padding: "16px 0" }}>
       {/* Toolbar */}
-      <div style={{ display: "flex", gap: 10, padding: "0 20px", marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, padding: "0 20px", marginBottom: 16 }}>
         <button onClick={() => onEdit(null)} style={{
           flex: 1, padding: "12px 0", borderRadius: 10,
           background: T.accent, border: "none",
-          color: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-        }}>+ Add Recipe</button>
+          color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+        }}>+ Add</button>
         <button onClick={onScan} style={{
           flex: 1, padding: "12px 0", borderRadius: 10,
           background: T.surface, border: `1px solid ${T.border}`,
-          color: T.text, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-        }}>📷 Scan Recipe</button>
+          color: T.text, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+        }}>📷 Scan</button>
+        <button onClick={onGenerate} style={{
+          flex: 1, padding: "12px 0", borderRadius: 10,
+          background: T.surface, border: `1px solid ${T.green}`,
+          color: T.green, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+        }}>🤖 Generate</button>
       </div>
 
       {categories.length === 0 && (

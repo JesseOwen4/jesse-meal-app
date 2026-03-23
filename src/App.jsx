@@ -20,6 +20,7 @@ import ReceiptScanPage from "./pages/ReceiptScanPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
 import ScanRecipePage from "./pages/ScanRecipePage";
+import GeneratePage from "./pages/GeneratePage";
 
 // Components
 import BottomNav from "./components/BottomNav";
@@ -238,6 +239,7 @@ export default function App() {
             recipeActions={recipeData}
             onScan={() => setTab("scan-recipe")}
             onEdit={(recipe) => setEditingRecipe(recipe === null ? {} : recipe)}
+            onGenerate={() => setTab("generate")}
           />
         )}
 
@@ -245,6 +247,14 @@ export default function App() {
           <ScanRecipePage
             setTab={setTab}
             onSaveRecipe={recipeData.addRecipe}
+          />
+        )}
+
+        {tab === "generate" && (
+          <GeneratePage
+            setTab={setTab}
+            pantryItems={pantry.items}
+            onAddRecipe={recipeData.addRecipe}
           />
         )}
 
