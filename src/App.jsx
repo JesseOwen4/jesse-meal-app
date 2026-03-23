@@ -182,6 +182,7 @@ export default function App() {
       <div style={{
         background: T.surface, borderBottom: `1px solid ${T.border}`,
         padding: "16px 20px 14px", position: "sticky", top: 0, zIndex: 10,
+        isolation: "isolate",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
@@ -210,7 +211,7 @@ export default function App() {
       </div>
 
       {/* ── CONTENT ── */}
-      <div style={{ flex: 1, overflowY: "auto", paddingBottom: 80 }}>
+      <div style={{ flex: 1, overflowY: "auto", paddingBottom: 100 }}>
         {tab === "plan" && (
           <PlanTab
             activeDay={activeDay} setActiveDay={setActiveDay}
