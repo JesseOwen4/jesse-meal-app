@@ -37,20 +37,6 @@ export default function App() {
   // ── Auth ──
   const auth = useAuth();
 
-  // Show login if not authenticated
-  if (auth.loading) return (
-    <div style={{ minHeight: "100vh", background: "#0e0f14", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ color: "#555a6a", fontFamily: "Georgia, serif", fontSize: 14 }}>Loading...</div>
-    </div>
-  );
-
-  if (!auth.user) return (
-    <LoginPage
-      onSignIn={auth.signIn}
-      onSignUp={auth.signUp}
-      onResetPassword={auth.resetPassword}
-    />
-  );
   // ── Navigation ──
   const [tab, setTab] = useState("plan");
   const [activeDay, setActiveDay] = useState(getTodayName);
@@ -58,7 +44,7 @@ export default function App() {
   // ── Modals ──
   const [editingMeal, setEditingMeal] = useState(null);
   const [editContent, setEditContent] = useState({ items: [], cals: "", p: "", f: "", c: "" });
-  const [swapMeal, setSwapMeal] = useState(null); // { day, meal }
+  const [swapMeal, setSwapMeal] = useState(null);
   const [expandedIdea, setExpandedIdea] = useState(null);
 
   const todayKey = getTodayKey();
@@ -109,20 +95,6 @@ export default function App() {
     }
     if (storageReady) fetchAllLogs();
   }, [storageReady, loggedMeals]);
-
-  // ── Auto grocery reset on Sunday ──
-  useEffect(() => {
-    if (!storageReady) return;
-    const today = new Date();
-    if (today.getDay() === 0) { // Sunday
-      const lastReset = localStorage.getItem("last-grocery-reset");
-      const todayStr = today.toISOString().split("T")[0];
-      if (lastReset !== todayStr) {
-        // Don't auto-reset, but we could. For now just mark it.
-        // Users can manually reset via button.
-      }
-    }
-  }, [storageReady]);
 
   // ── Quick-log from notification URL param ──
   useEffect(() => {
@@ -181,7 +153,21 @@ export default function App() {
     setSwapMeal(null);
   };
 
-  // ── Loading ──
+  // ── AUTH GATES (after all hooks) ──
+  if (auth.loading) return (
+    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: T.textDim, fontFamily: "Georgia, serif", fontSize: 14 }}>Loading...</div>
+    </div>
+  );
+
+  if (!auth.user) return (
+    <LoginPage
+      onSignIn={auth.signIn}
+      onSignUp={auth.signUp}
+      onResetPassword={auth.resetPassword}
+    />
+  );
+
   if (!storageReady) return (
     <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ color: T.textDim, fontFamily: "Georgia, serif", fontSize: 14 }}>Loading your plan...</div>
