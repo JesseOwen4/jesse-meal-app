@@ -21,10 +21,10 @@ export default function BottomNav({ tab, setTab, viewMode }) {
 
   return (
     <div style={{
-      position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-      width: "100%", maxWidth: 480, background: T.surface,
+      position: "fixed", bottom: 0, left: 0, right: 0,
+      background: T.surface,
       borderTop: `1px solid ${T.border}`, display: "flex", zIndex: 10,
-      paddingBottom: "env(safe-area-inset-bottom, 8px)",
+      paddingBottom: 0,
     }}>
       {tabs.map(item => (
         <button key={item.id} onClick={() => setTab(item.id)} style={{
